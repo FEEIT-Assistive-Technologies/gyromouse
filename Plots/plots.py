@@ -51,8 +51,6 @@ plt.xlim(left=1782223961, right=1782223971.6)
 plt.legend(loc="lower left")
 plt.legend(fontsize=18)
 
-# 5. Display the plot
-plt.show()
 
 plt.show()
 
