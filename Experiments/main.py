@@ -24,12 +24,96 @@ clicks = []
 
 screen_width, screen_height = pyautogui.size()
 
+import time
+
+
+class ConsoleStopwatch:
+    def __init__(self):
+        self.running = False
+        self.start_time = 0.0
+        self.elapsed_time = 0.0
+        self.laps = []
+
+    def get_elapsed(self):
+        if self.running:
+            return self.elapsed_time + (time.time() - self.start_time)
+        return self.elapsed_time
+
+    def format_time(self, seconds):
+        mins = int(seconds // 60)
+        secs = int(seconds % 60)
+        millis = int((seconds % 1) * 100)
+        return f"{mins:02d}:{secs:02d}:{millis:02d}"
+
+    def start(self):
+        if not self.running:
+            self.running = True
+            self.start_time = time.time()
+            print("\n[Stopwatch Started]")
+
+    def stop(self):
+        if self.running:
+            self.elapsed_time += time.time() - self.start_time
+            self.running = False
+            print(f"\n[Stopwatch Paused] Current Time: {self.format_time(self.get_elapsed())}")
+
+    def lap(self):
+        current_time = self.get_elapsed()
+        if current_time > 0:
+            lap_time_str = self.format_time(current_time)
+            self.laps.append(lap_time_str)
+            print(f"\n[Lap {len(self.laps):02d}] Recorded: {lap_time_str}")
+        else:
+            print("\n[Stopwatch hasn't started yet]")
+
+    def reset(self):
+        self.running = False
+        self.start_time = 0.0
+        self.elapsed_time = 0.0
+        self.laps.clear()
+        print("\n[Stopwatch Reset]")
+
+    def show_laps(self):
+        if not self.laps:
+            print("\nNo laps recorded yet.")
+        else:
+            print("\n--- Lap History ---")
+            for i, lap in enumerate(self.laps, 1):
+                print(f"Lap {i:02d} — {lap}")
+
+    def run(self):
+        print("=== Console Stopwatch with Laps ===")
+        while True:
+            current_str = self.format_time(self.get_elapsed())
+            print(f"\nCurrent Time: {current_str} {'(Running)' if self.running else '(Paused)'}")
+            print("1. Start  2. Stop  3. Lap  4. Show Laps  5. Reset  6. Exit")
+
+            choice = input("Enter choice (1-6): ").strip()
+
+            if choice == '1':
+                self.start()
+            elif choice == '2':
+                self.stop()
+            elif choice == '3':
+                self.lap()
+            elif choice == '4':
+                self.show_laps()
+            elif choice == '5':
+                self.reset()
+            elif choice == '6':
+                print("\nExiting stopwatch. Goodbye!")
+                break
+            else:
+                print("\nInvalid choice. Please select between 1 and 6.")
 
 def distance(p1, p2):
     return math.hypot(p1[0] - p2[0], p1[1] - p2[1])
 
 
 running = True
+
+stopwatch = ConsoleStopwatch()
+stopwatch.start()
 
 while running:
     screen.fill((245, 245, 245))
@@ -64,6 +148,8 @@ while running:
 
                 # Move the cursor to the random location
                 pyautogui.moveTo(random_x, random_y)
+
+                stopwatch.lap()
 
     if len(clicks) == NUM_CLICKS:
         running = False
@@ -120,3 +206,6 @@ print(f"CEP50             : {cep50:.2f} px")
 print(f"CEP95             : {cep95:.2f} px")
 print(f"Maximum Error     : {max_error:.2f} px")
 print("=============================\n")
+
+stopwatch.stop()
+stopwatch.show_laps()
