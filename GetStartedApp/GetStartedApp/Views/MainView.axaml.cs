@@ -9,7 +9,7 @@ using Avalonia.Controls.Platform;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
 using HidSharp;
-using RJCP.IO.Ports;
+//using RJCP.IO.Ports;
 using Serilog;
 using Serilog.Core;
 using Serilog.Events;
@@ -34,7 +34,7 @@ public partial class MainView : UserControl
 
 
         Refresh_Click(null, new RoutedEventArgs());
-        ListenFornDevices();
+      //  ListenFornDevices();
         // HidSharp.DeviceList.Local.RaiseChanged();
     }
 
@@ -143,10 +143,10 @@ public partial class MainView : UserControl
         Log.Information("Serial ports refreshed");
         DropDown.Items.Clear();
         //var serport = new SerialPort(DropDown.SelectedItem as string);
-        foreach (var item in SerialPortStream.GetPortDescriptions())
-        {
-            DropDown.Items.Add(item);
-        }
+     //   foreach (var item in SerialPortStream.GetPortDescriptions())
+     //   {
+     //       DropDown.Items.Add(item);
+      //  }
 
 
     }
@@ -163,7 +163,7 @@ public partial class MainView : UserControl
             Log.Warning("No port selected!");
             return;
         }
-        _serialPort.PortName = ((PortDescription)DropDown.SelectedItem).Port;
+        _serialPort.PortName = "((PortDescription)DropDown.SelectedItem).Port";
         _serialPort.BaudRate = 115200;
         _serialPort.DataReceived += SerialPort_DataReceived;
         _serialPort.ErrorReceived += _serialPort_ErrorReceived;
