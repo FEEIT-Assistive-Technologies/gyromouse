@@ -78,6 +78,7 @@ static void vendorEventCallback(void *arg, esp_event_base_t event_base,
       }
       break;
 
+      
     default:
       break;
     }
@@ -192,4 +193,16 @@ void reportButtonState(int btn) {
 void loop() {
   reportButtonState(0);
   //  delay(10);
+    uint8_t buffer[64];
+  memset(buffer, 0, sizeof(buffer));
+  
+  // Fill the buffer with your custom payload
+  buffer[0] = 0xAA; // Example command/header
+  buffer[1] = 0x01; 
+
+  // Send the raw HID report to the host
+ 
+    Vendor->write(buffer, 64);
+    
+  
 }
