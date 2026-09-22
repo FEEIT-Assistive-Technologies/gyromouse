@@ -6,8 +6,10 @@ using System.Management;
 using System.Threading.Tasks;
 using Avalonia.Controls;
 using Avalonia.Controls.Platform;
+using Avalonia.Diagnostics;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
+using HidApi;
 using HidSharp;
 //using RJCP.IO.Ports;
 using Serilog;
@@ -34,7 +36,7 @@ public partial class MainView : UserControl
 
 
         Refresh_Click(null, new RoutedEventArgs());
-      //  ListenFornDevices();
+        //  ListenFornDevices();
         // HidSharp.DeviceList.Local.RaiseChanged();
     }
 
@@ -95,12 +97,12 @@ public partial class MainView : UserControl
         var deviceList = DeviceList.Local;
         Task.Delay(50).Wait();
         var devices = deviceList.GetHidDevices(vendorId, productId);
-        if (devices.Count()==0)
+        if (devices.Count() == 0)
         {
             Log.Information("Inserted device is not what we want");
             return;
         }
-        
+
 
 
         if (_hidStream is null)
@@ -142,17 +144,43 @@ public partial class MainView : UserControl
     {
         Log.Information("Serial ports refreshed");
         DropDown.Items.Clear();
+        foreach (var deviceInfo in Hid.Enumerate())
+        {
+
+            DropDown.Items.Add($"{deviceInfo.ProductString} {deviceInfo.UsagePage} {deviceInfo.Usage}");
+
+
+        }
+        Hid.Exit();
+        //C
         //var serport = new SerialPort(DropDown.SelectedItem as string);
-     //   foreach (var item in SerialPortStream.GetPortDescriptions())
-     //   {
-     //       DropDown.Items.Add(item);
-      //  }
+        //   foreach (var item in SerialPortStream.GetPortDescriptions())
+        //   {
+        //       DropDown.Items.Add(item);
+        //  }
 
 
     }
 
     private void Connect_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
+
+        /*
+        sudo nano /etc/udev/rules.d/99-hid-permissions.rules
+
+
+        SUBSYSTEM=="hidraw", ATTRS{idVendor}=="04b8", ATTRS{idProduct}=="014a", MODE="0666"
+
+
+        sudo udevadm control --reload-rules
+        sudo udevadm trigger     
+        */
+        var deviceInfo = Hid.Enumerate().Where(x => x.VendorId == 12346 && x.ProductId == 4097 && x.UsagePage == 65280 && x.Usage == 1).First();
+        var device = deviceInfo.ConnectToDevice();
+
+       var bytes =device.ReadTimeout(64,1000);
+
+
         if (_serialPort is null)
             _serialPort = new SerialPort();
         if (_serialPort.IsOpen)
