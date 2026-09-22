@@ -43,7 +43,7 @@ esp_now_peer_info_t peerInfo;
 
 
 // callback when data is sent
-void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status)
+void OnDataSent(const wifi_tx_info_t *info, esp_now_send_status_t status)
 {
   if (!DEBUG)
   {
@@ -138,6 +138,7 @@ void loop()
 
   // Send message via ESP-NOW
   esp_err_t result = esp_now_send(broadcastAddress, (uint8_t *)&myData, sizeof(myData));
+  
   if (!DEBUG)
     if (result == ESP_OK)
     {

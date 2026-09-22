@@ -3,6 +3,7 @@ import math
 import statistics
 import random
 import pyautogui
+import pygame.sysfont 
 
 # ----------------------------
 # Settings

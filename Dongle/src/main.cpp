@@ -128,7 +128,7 @@ void OnDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len) {
     Serial.print(">sumy:");
     Serial.println(sumy);
 
-    if (abs(varx) < 2 && abs(vary) < 2)
+    if (abs(varx) < 2 && abs(vary) < 2){}
       AbsMouse->move(sumx * 10, sumy * 10);
   } break;
   }
