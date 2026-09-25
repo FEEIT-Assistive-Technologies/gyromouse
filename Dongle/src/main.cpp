@@ -11,7 +11,7 @@
 
 #include <WiFi.h>
 #include <esp_now.h>
-
+#include <ArduinoJson.h>
 
 #if ARDUINO_USB_MODE
 #warning This sketch should be used when USB is in OTG mode
@@ -29,21 +29,32 @@ USBHIDMouse *Mouse = NULL;
 USBHIDAbsoluteMouse *AbsMouse = NULL;
 USBHIDKeyboard *Keyboard = NULL;
 
-enum MouseModes { None = 0, Calibration = 1, Direct = 2, Integration = 3 };
+JsonDocument doc;
+bool DEBUG = 1;
+enum MouseModes
+{
+  None = 0,
+  Calibration = 1,
+  Direct = 2,
+  Integration = 3
+};
 
-class Configuration {
+class Configuration
+{
 public:
   MouseModes mouseMode = Direct;
   bool triggerCalibration = false;
   bool recenterTrigger = false;
   bool enableMouse = true;
+  float sensitivityMultiplyer = 1.0f;
 };
 
 Configuration config;
 
 // Structure example to receive data
 // Must match the sender structure
-typedef struct struct_message {
+typedef struct struct_message
+{
   float ax;
   float ay;
   float az;
@@ -54,31 +65,46 @@ typedef struct struct_message {
 
 // Create a struct_message called myData
 struct_message myData;
-
-static void vendorEventCallback(void *arg, esp_event_base_t event_base,
-                                int32_t event_id, void *event_data) {
-  if (event_base == ARDUINO_USB_HID_VENDOR_EVENTS) {
-    arduino_usb_hid_vendor_event_data_t *data =
-        (arduino_usb_hid_vendor_event_data_t *)event_data;
-    switch (event_id) {
+byte buffer[63];
+static void vendorEventCallback(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
+{
+  if (event_base == ARDUINO_USB_HID_VENDOR_EVENTS)
+  {
+    arduino_usb_hid_vendor_event_data_t *data = (arduino_usb_hid_vendor_event_data_t *)event_data;
+    switch (event_id)
+    {
     case ARDUINO_USB_HID_VENDOR_GET_FEATURE_EVENT:
       Serial.printf("HID VENDOR GET FEATURE: len:%u\n", data->len);
       break;
-    case ARDUINO_USB_HID_VENDOR_SET_FEATURE_EVENT:
+    case ARDUINO_USB_HID_VENDOR_SET_FEATURE_EVENT:{
+
       Serial.printf("HID VENDOR SET FEATURE: len:%u\n", data->len);
-      for (uint16_t i = 0; i < data->len; i++) {
+      for (uint16_t i = 0; i < data->len; i++)
+      {
         Serial.printf("0x%02X ", *(data->buffer));
       }
       Serial.println();
-      break;
-    case ARDUINO_USB_HID_VENDOR_OUTPUT_EVENT:
-      Serial.printf("HID VENDOR OUTPUT: len:%u\n", data->len);
-      for (uint16_t i = 0; i < data->len; i++) {
-        Serial.write(Vendor->read());
-      }
-      break;
-
       
+      DeserializationError resaa = deserializeJson(doc, buffer);
+      if (resaa == DeserializationError::Ok)
+      {
+        config.sensitivityMultiplyer = doc["mouseSpeed"];
+        Serial.printf("mouse sensitivity :%f \n", config.sensitivityMultiplyer);
+      }
+
+
+
+      break;
+    }
+      /*   case ARDUINO_USB_HID_VENDOR_OUTPUT_EVENT:
+           Serial.printf("HID VENDOR OUTPUT: len:%u\n", data->len);
+           for (uint16_t i = 0; i < data->len; i++)
+           {
+             Serial.write(Vendor->read());
+           }
+           break;
+     */
+
     default:
       break;
     }
@@ -89,31 +115,40 @@ byte usbHIDVendorSize = 64;
 float sumx = 16384 / 10;
 float sumy = 16384 / 10;
 // callback function that will be executed when data from esp_now is received
-void OnDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len) {
+void OnDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len)
+{
   memcpy(&myData, incomingData, sizeof(myData));
 
-  switch (config.mouseMode) {
-  case Direct: {
-    
+  switch (config.mouseMode)
+  {
+  case Direct:
+  {
 
-    float varx = -myData.gy -2.5+1.1;
-    float vary = myData.gz +0.65;
+    float varx = -myData.gy - 2.5 + 1.1;
+    float vary = myData.gz + 0.65;
 
     Serial.print(">varx:");
     Serial.println(varx);
     Serial.print(">vary:");
     Serial.println(vary);
 
-    if (abs(varx) < 2) {
+    if (abs(varx) < 2)
+    {
       varx = 0;
     }
-    if (abs(vary) < 2) {
+    if (abs(vary) < 2)
+    {
       vary = 0;
     }
 
-    Mouse->move((uint8_t)varx, (uint8_t)vary);
-  } break;
-  case Integration: {
+    int8_t x_scaled = varx * config.sensitivityMultiplyer;
+    int8_t y_scaled = vary * config.sensitivityMultiplyer;
+
+    Mouse->move(x_scaled, y_scaled);
+  }
+  break;
+  case Integration:
+  {
     float varx = -myData.gy - 3.11 + 0.85 + 0.0599;
     float vary = myData.gz + 0.5 + 0.17 + 0.0252;
 
@@ -129,13 +164,17 @@ void OnDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len) {
     Serial.print(">sumy:");
     Serial.println(sumy);
 
-    if (abs(varx) < 2 && abs(vary) < 2){}
-      AbsMouse->move(sumx * 10, sumy * 10);
-  } break;
+    if (abs(varx) < 2 && abs(vary) < 2)
+    {
+    }
+    AbsMouse->move(sumx * 10, sumy * 10);
+  }
+  break;
   }
 }
 
-void setup() {
+void setup()
+{
   /* ke se prfrli na komunikacija so usb hid
    * raboti so builtin USB bibliotekata za esp
    * samo treba usb mode da se podesi
@@ -151,16 +190,18 @@ void setup() {
   Serial.begin(115200);
 
   Vendor = new USBHIDVendor();
-  Vendor->onEvent(vendorEventCallback);
   Vendor->begin();
+  Vendor->onEvent(vendorEventCallback);
   Keyboard = new USBHIDKeyboard();
   Keyboard->begin();
 
-  if (config.mouseMode == Direct) {
+  if (config.mouseMode == Direct)
+  {
     Mouse = new USBHIDMouse();
     Mouse->begin();
   }
-  if (config.mouseMode == Integration) {
+  if (config.mouseMode == Integration)
+  {
     AbsMouse = new USBHIDAbsoluteMouse();
     AbsMouse->begin();
   }
@@ -171,7 +212,8 @@ void setup() {
   WiFi.mode(WIFI_STA);
 
   // Init ESP-NOW
-  if (esp_now_init() != ESP_OK) {
+  if (esp_now_init() != ESP_OK)
+  {
     Serial.println("Error initializing ESP-NOW");
     return;
   }
@@ -183,26 +225,29 @@ void setup() {
   pinMode(0, INPUT_PULLUP);
 }
 bool B1_prevState = false;
-void reportButtonState(int btn) {
-  if (digitalRead(btn) == B1_prevState) {
+void reportButtonState(int btn)
+{
+  if (digitalRead(btn) == B1_prevState)
+  {
     B1_prevState = !B1_prevState;
 
     Serial.printf("B,%d,%d\r\n", btn, !digitalRead(btn));
   }
 }
-void loop() {
+void loop()
+{
   reportButtonState(0);
   //  delay(10);
-    uint8_t buffer[64];
-  memset(buffer, 0, sizeof(buffer));
-  
+
+  // memset(buffer, 0, sizeof(buffer));
+
   // Fill the buffer with your custom payload
-  buffer[0] = 0xAA; // Example command/header
-  buffer[1] = 0x01; 
+  // buffer[0] = 0xAA; // Example command/header
+  // buffer[1] = 0x01;
 
   // Send the raw HID report to the host
- 
-    Vendor->write(buffer, 64);
-    
-  
+
+  //  Vendor->write(buffer, 250);
+
+  // if(DEBUG ){Serial.printf("available for read %d,   available for write %d\n", Vendor->available(), Vendor->availableForWrite());}
 }

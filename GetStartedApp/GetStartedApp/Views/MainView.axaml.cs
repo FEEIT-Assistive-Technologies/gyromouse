@@ -3,14 +3,20 @@ using System.Diagnostics;
 using System.IO.Ports;
 using System.Linq;
 using System.Management;
+using System.Text;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 using Avalonia.Controls;
 using Avalonia.Controls.Platform;
 using Avalonia.Diagnostics;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
+using DynamicData;
 using HidApi;
 using HidSharp;
+using Metsys.Bson;
+
 //using RJCP.IO.Ports;
 using Serilog;
 using Serilog.Core;
@@ -36,6 +42,9 @@ public partial class MainView : UserControl
 
 
         Refresh_Click(null, new RoutedEventArgs());
+
+
+
         //  ListenFornDevices();
         // HidSharp.DeviceList.Local.RaiseChanged();
     }
@@ -161,7 +170,7 @@ public partial class MainView : UserControl
 
 
     }
-
+    HidApi.Device _device;
     private void Connect_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
 
@@ -175,43 +184,40 @@ public partial class MainView : UserControl
         sudo udevadm control --reload-rules
         sudo udevadm trigger     
         */
-        var deviceInfo = Hid.Enumerate().Where(x => x.VendorId == 12346 && x.ProductId == 4097 && x.UsagePage == 65280 && x.Usage == 1).First();
-        var device = deviceInfo.ConnectToDevice();
-
-       var bytes =device.ReadTimeout(64,1000);
-
-
-        if (_serialPort is null)
-            _serialPort = new SerialPort();
-        if (_serialPort.IsOpen)
-            return;
-
-        if (DropDown.SelectedItem is null)
-        {
-            Log.Warning("No port selected!");
-            return;
-        }
-        _serialPort.PortName = "((PortDescription)DropDown.SelectedItem).Port";
-        _serialPort.BaudRate = 115200;
-        _serialPort.DataReceived += SerialPort_DataReceived;
-        _serialPort.ErrorReceived += _serialPort_ErrorReceived;
-        _serialPort.DtrEnable = true;
-        _serialPort.RtsEnable = true;
         try
         {
 
-            _serialPort.Open();
-            Log.Information("Connected to serial port");
-            //   _serialPort.DiscardOutBuffer();
-            //   _serialPort.DiscardInBuffer();
+            var deviceInfo = Hid.Enumerate().Where(x => x.VendorId == 12346 && x.ProductId == 4097 && x.UsagePage == 65280 && x.Usage == 1).First();
+
+            _device = deviceInfo.ConnectToDevice();
         }
-        catch (Exception exception)
+        catch (Exception ex)
         {
-            Log.Warning("Cannot open serial port!");
-            Log.Debug(exception.Message);
+            Log.Error(ex.Message);
         }
 
 
+        Task.Factory.StartNew(() =>
+{
+while (false)
+{
+try
+{
+    var data = _device.ReadTimeout(64, 1000);
+    string a = "";
+    foreach (var charr in data)
+    {
+        a += charr;
+    }
+    Log.Information(a);
+}
+catch (Exception ex)
+{
+
+}
+}
+}, TaskCreationOptions.LongRunning);
+        return;
     }
 
     private void _serialPort_ErrorReceived(object? sender, System.IO.Ports.SerialErrorReceivedEventArgs e)
@@ -354,13 +360,8 @@ public partial class MainView : UserControl
 
     private void Discconect_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
-        var prev = _serialPort.IsOpen;
-        if (_serialPort is not null)
-            if (_serialPort.IsOpen)
-            {
-                _serialPort.Close();
-            }
-        Log.Information($"Serial Port closing from {prev} to {_serialPort.IsOpen}");
+        Hid.Exit();
+        Log.Information($"HID device disconnected");
     }
 
 
@@ -377,7 +378,39 @@ public partial class MainView : UserControl
         }
     }
 
+    class Message
+    {
+        [JsonInclude]
+        public float mouseSpeed = 1.0f;
+    }
+    private void MouseSpeed_ValueChanged(object? sender, Avalonia.Controls.Primitives.RangeBaseValueChangedEventArgs e)
+    {
+        var message = new Message();
+        message.mouseSpeed = 3.4f;
+        var str = JsonSerializer.Serialize(message);
+        byte[] jsonString = Encoding.UTF8.GetBytes(str);
+        if (_device is not null)
+        {
+            try
+            {
+                byte[] test = new byte[63];
+                test[0] = 6;
+                Array.Copy(jsonString, 0, test, 1, jsonString.Length);
 
+              //  var test2 = _device.SendFeatureReport(test);
+                
+                _device.SendFeatureReport(test);
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex.Message);
+            }
+        }
+        else
+        {
+            Log.Information("device is not connected");
+        }
+    }
 }
 
 public class TextBoxSink : ILogEventSink
